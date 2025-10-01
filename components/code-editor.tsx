@@ -1,27 +1,71 @@
+// src/components/code-editor.tsx
 "use client"
 
-import { Copy, Code } from "lucide-react"
+import { Copy, Code, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useState } from "react"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dracula, atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTheme } from 'next-themes'; 
 
-interface FileTab {
+
+interface CodeFile {
   id: string
   name: string
+  content: string 
 }
 
 interface CodeEditorProps {
-  files: FileTab[]
+  files: CodeFile[]
   activeFileId: string
   onTabChange: (fileId: string) => void
+  onFileContentChange: (fileId: string, newContent: string) => void
   onCopyCode: () => void
   onFormatCode: () => void
+  onDownloadCode: () => void
+  framework: string; // ADD FRAMEWORK PROP
 }
 
-export function CodeEditor({ files, activeFileId, onTabChange, onCopyCode, onFormatCode }: CodeEditorProps) {
+// Helper to map selected framework to Prism.js language codes
+const getLanguage = (framework: string) => {
+    switch (framework) {
+        case 'react':
+        case 'nextjs':
+            return 'jsx'; 
+        case 'vue':
+            return 'markup';
+        case 'html':
+        default:
+            return 'html';
+    }
+}
+
+export function CodeEditor({ 
+  files, 
+  activeFileId, 
+  onTabChange, 
+  onFileContentChange, 
+  onCopyCode, 
+  onFormatCode,
+  onDownloadCode,
+  framework
+}: CodeEditorProps) {
+  
+  const activeFile = files.find(f => f.id === activeFileId);
+  const codeContent = activeFile ? activeFile.content : "// File not found";
+
+  const [isEditing, setIsEditing] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const themeStyle = resolvedTheme === 'light' ? atomDark : dracula; 
+  const language = getLanguage(framework); 
+  
+  // Custom background color to match the Dracula theme for seamless look
+  const codeBackground = resolvedTheme === 'dark' ? '#282a36' : '#282c34';
+
+
   return (
     <div className="flex h-full flex-col">
-      {/* Tab bar and action buttons */}
       <div className="flex items-center justify-between border-b border-border bg-background px-2">
-        {/* File tabs */}
         <div className="flex items-center gap-1 overflow-x-auto">
           {files.map((file) => (
             <button
@@ -38,25 +82,60 @@ export function CodeEditor({ files, activeFileId, onTabChange, onCopyCode, onFor
           ))}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pr-2">
+          <Button 
+            variant={isEditing ? "secondary" : "ghost"} 
+            size="sm" 
+            onClick={() => setIsEditing(prev => !prev)} 
+            className="h-8 gap-2"
+          >
+            <Code className="h-4 w-4" />
+            {isEditing ? "View Code" : "Edit Code"}
+          </Button>
+
           <Button variant="ghost" size="sm" onClick={onFormatCode} className="h-8 gap-2">
             <Code className="h-4 w-4" />
             Format
           </Button>
           <Button variant="ghost" size="sm" onClick={onCopyCode} className="h-8 gap-2">
             <Copy className="h-4 w-4" />
-            Copy Code
+            Copy
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDownloadCode} className="h-8 gap-2">
+            <Download className="h-4 w-4" />
+            Download
           </Button>
         </div>
       </div>
 
-      {/* Editor container */}
-      <div className="flex-1 bg-[var(--color-panel-editor)] p-4">
-        <div className="h-full w-full rounded-md border border-border bg-black/20 p-4 font-mono text-sm text-foreground">
-          {/* Code editor will be mounted here */}
-          <div className="text-muted-foreground">Editor instance will be mounted here...</div>
-        </div>
+      {/* Editor/Highlighter Container */}
+      <div className="flex-1 bg-[var(--color-panel-editor)] overflow-auto">
+        {isEditing ? (
+          <textarea
+            value={codeContent}
+            onChange={(e) => onFileContentChange(activeFileId, e.target.value)}
+            placeholder="// Code output will be streamed here..."
+            className="h-full w-full resize-none font-mono text-sm bg-[var(--color-panel-editor)] text-foreground p-4 focus:outline-none"
+            spellCheck="false"
+          />
+        ) : (
+          <SyntaxHighlighter
+            style={themeStyle}
+            language={language}
+            customStyle={{
+              padding: '1.25rem',
+              margin: 0,
+              minHeight: '100%',
+              backgroundColor: codeBackground,
+              fontFamily: 'var(--font-mono)', 
+              fontSize: '14px',
+            }}
+            showLineNumbers={true}
+            lineNumberStyle={{ color: '#6A6A6A', paddingRight: '15px' }}
+          >
+            {codeContent}
+          </SyntaxHighlighter>
+        )}
       </div>
     </div>
   )
